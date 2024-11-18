@@ -1,3 +1,5 @@
+ReadMe borrowed from OpenLayers offical website. To demo the map, simply clone the repo and follow the instructions below!
+
 # OpenLayers + Vite
 
 This example demonstrates how the `ol` package can be used with [Vite](https://vitejs.dev/).
