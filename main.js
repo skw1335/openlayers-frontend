@@ -1,4 +1,5 @@
 import Feature from 'ol/Feature.js';
+import { circular } from 'ol/geom/Polygon';
 import OSM from 'ol/source/OSM';
 import GeoJSON from 'ol/format/GeoJSON.js';
 import ImageTile from 'ol/source/ImageTile.js';
@@ -13,28 +14,73 @@ import {
   Style,
   Text,
 } from 'ol/style.js';
-import {Cluster, Vector as VectorSource} from 'ol/source.js';
-import {LineString, Point, Polygon} from 'ol/geom.js';
-import {Tile as TileLayer, Vector as VectorLayer} from 'ol/layer.js';
-import {createEmpty, extend, getHeight, getWidth} from 'ol/extent.js';
-import {fromLonLat} from 'ol/proj.js';
+import { Cluster, Vector as VectorSource } from 'ol/source.js';
+import { LineString, Point, Polygon } from 'ol/geom.js';
+import { Tile as TileLayer, Vector as VectorLayer } from 'ol/layer.js';
+import { createEmpty, extend, getHeight, getWidth } from 'ol/extent.js';
+import { fromLonLat } from 'ol/proj.js';
+import { MapboxVectorLayer } from 'ol-mapbox-style';
+import Control from 'ol/control/Control';
 
 const circleDistanceMultiplier = 1;
 const circleFootSeparation = 28;
 const circleStartAngle = Math.PI / 2;
 
-const convexHullFill = new Fill({
-  color: 'rgba(255, 153, 0, 0.4)',
+//Red
+const convexHullFillLarge = new Fill({
+  color: 'rgba(255, 53, 10, 0.4)',
 });
-const convexHullStroke = new Stroke({
-  color: 'rgba(204, 85, 0, 1)',
+
+//Yellow
+const convexHullFillMedium = new Fill({
+  color: 'rgba(0, 161, 0, 0.4)',
+});
+
+//Blue 
+const convexHullFillSmall = new Fill({
+  color: 'rgba(0, 53, 255, 0.4)',
+});
+
+//Red
+const convexHullStrokeLarge = new Stroke({
+  color: 'rgba(255, 53, 10, .7)',
   width: 1.5,
 });
-const outerCircleFill = new Fill({
+
+//Green
+const convexHullStrokeMedium = new Stroke({
+  color: 'rgba(0, 191, 0, .7)',
+  width: 1.5,
+});
+
+//Blue 
+const convexHullStrokeSmall = new Stroke({
+  color: 'rgba(0, 53, 255, .7)',
+  width: 1.5,
+});
+
+//Red
+const outerCircleFillLarge = new Fill({
+  color: 'rgba(255, 53, 10, 0.3)',
+});
+const innerCircleFillLarge = new Fill({
+  color: 'rgba(255, 65, 10, 0.7)',
+});
+
+//Yellow
+const outerCircleFillMedium = new Fill({
   color: 'rgba(255, 153, 102, 0.3)',
 });
-const innerCircleFill = new Fill({
-  color: 'rgba(255, 165, 0, 0.7)',
+const innerCircleFillMedium = new Fill({
+  color: 'rgba(255, 165, 102, 0.7)',
+});
+
+//Blue
+const outerCircleFillSmall = new Fill({
+  color: 'rgba(0, 53, 255, 0.3)',
+});
+const innerCircleFillSmall = new Fill({
+  color: 'rgba(0, 53, 255, 0.7)',
 });
 const textFill = new Fill({
   color: '#fff',
@@ -43,18 +89,47 @@ const textStroke = new Stroke({
   color: 'rgba(0, 0, 0, 0.6)',
   width: 3,
 });
-const innerCircle = new CircleStyle({
-  radius: 14,
-  fill: innerCircleFill,
+
+const innerCircleLarge = new CircleStyle({
+  radius: 5,
+  fill: innerCircleFillLarge,
 });
-const outerCircle = new CircleStyle({
-  radius: 20,
-  fill: outerCircleFill,
+const outerCircleLarge = new CircleStyle({
+  radius: 13,
+  fill: outerCircleFillLarge,
 });
 
-const icon = new Icon({
-  src: 'data/marker-icon.png',
+const innerCircleMedium = new CircleStyle({
+  radius: 5,
+  fill: innerCircleFillMedium,
 });
+const outerCircleMedium = new CircleStyle({
+  radius: 13,
+  fill: outerCircleFillMedium,
+});
+
+const innerCircleSmall = new CircleStyle({
+  radius: 5,
+  fill: innerCircleFillSmall,
+});
+const outerCircleSmall = new CircleStyle({
+  radius: 13,
+  fill: outerCircleFillSmall,
+});
+
+/*const innerCircle = new CircleStyle({
+  radius: 4,
+  fill: innerCircleFillSmall,
+});
+const outerCircle = new CircleStyle({
+  radius: 10,
+  fill: outerCircleFillSmall,
+}); */
+
+const mapIcon = new Icon({
+  src: './data/marker-icon.png',
+});
+
 
 /**
  * Single feature style, users for clusters with 1 feature and cluster circles.
@@ -64,7 +139,7 @@ const icon = new Icon({
 function clusterMemberStyle(clusterMember) {
   return new Style({
     geometry: clusterMember.getGeometry(),
-    image: icon, 
+    image: mapIcon,
   });
 }
 
@@ -81,6 +156,16 @@ function clusterCircleStyle(cluster, resolution) {
   }
   const clusterMembers = cluster.get('features');
   const centerCoordinates = cluster.getGeometry().getCoordinates();
+
+  let convexHullStroke;
+  if (clusterMembers.length <= 5) {
+    convexHullStroke = convexHullStrokeSmall;
+  } else if (clusterMembers.length >= 5 && clusterMembers.length <= 10) {
+    convexHullStroke = convexHullStrokeMedium;
+  } else {
+    convexHullStroke = convexHullStrokeLarge;
+  }
+
   return generatePointsCircle(
     clusterMembers.length,
     cluster.getGeometry().getCoordinates(),
@@ -152,6 +237,22 @@ function clusterHullStyle(cluster) {
   const points = originalFeatures.map((feature) =>
     feature.getGeometry().getCoordinates(),
   );
+  let convexHullFill;
+  let convexHullStroke;
+
+  const numPoints = points.length;
+
+  if (numPoints <= 5) {
+    convexHullFill = convexHullFillSmall;
+    convexHullStroke = convexHullStrokeSmall;
+  } else if (numPoints >= 5 && numPoints <= 10) {
+    convexHullFill = convexHullFillMedium;
+    convexHullStroke = convexHullStrokeMedium;
+  } else if (numPoints >= 10) {
+    convexHullFill = convexHullFillLarge;
+    convexHullStroke = convexHullStrokeLarge;
+  }
+
   return new Style({
     geometry: new Polygon([monotoneChainConvexHull(points)]),
     fill: convexHullFill,
@@ -159,15 +260,40 @@ function clusterHullStyle(cluster) {
   });
 }
 
+function getColorBySize(size) {
+  if (size <= 5) {
+    return '#1c57ff';
+  } else if (size <= 10) {
+    return '#00a100';
+  } else if (size > 10) {
+    return '#b70000';
+  }
+}
+
+
+
 function clusterStyle(feature) {
   const size = feature.get('features').length;
+
+  const circleColor = getColorBySize(size);
+
+  const dynamicOuterCircle = new CircleStyle({
+    radius: 10,
+    fill: new Fill({ color: circleColor }),
+  });
+
+  const dynamicInnerCircle = new CircleStyle({
+    radius: 4,
+    fill: new Fill({ color: circleColor }),
+  });
+
   if (size > 1) {
     return [
       new Style({
-        image: outerCircle,
+        image: dynamicOuterCircle,
       }),
       new Style({
-        image: innerCircle,
+        image: dynamicInnerCircle,
         text: new Text({
           text: size.toString(),
           fill: textFill,
@@ -209,24 +335,86 @@ const clusterCircles = new VectorLayer({
 });
 
 const osm = new TileLayer({
-	source: new OSM(),
+  source: new OSM(),
 });
 
+const mapbox_api_key = 'pk.eyJ1Ijoic2t3MTMzNSIsImEiOiJjbHhrbzh3bjcwM2U2MmpwdGs2dW9rd2VwIn0.sP8c7ShOG2tMIhCJzEcJaQ'
+
+
+const mapbox_map = new MapboxVectorLayer({
+  styleUrl: 'mapbox://styles/mapbox/streets-v12',
+  accessToken: mapbox_api_key,
+});
+
+const source = new VectorSource();
+const lc = new VectorLayer({
+  source: source,
+});
 
 const map = new Map({
-  layers: [osm, clusterHulls, clusters, clusterCircles],
+  layers: [mapbox_map, lc, clusterHulls, clusters, clusterCircles],
   target: 'map',
   view: new View({
     center: [0, 0],
     zoom: 2,
-    maxZoom: 19, 
+    maxZoom: 19,
     extent: [
-	    ...fromLonLat([-71.180772, 42.252779]),
-	    ...fromLonLat([-71.015035, 42.472732]),
-	],
+      ...fromLonLat([-71.180772, 42.252779]),
+      ...fromLonLat([-71.015035, 42.472732]),
+    ],
     showFullExtent: true,
   }),
 });
+
+navigator.geolocation.watchPosition(
+  function (pos) {
+    const coords = [pos.coords.longitude, pos.coords.latitude];
+    //const accuracy = circular(coords, pos.coords.accuracy);
+    source.clear(true);
+    source.addFeatures([
+      //new Feature(
+      //  accuracy.transform('EPSG:4326', map.getView().getProjection())
+      //),
+      new Feature(new Point(fromLonLat(coords))),
+    ]);
+    const features = source.getFeatures()
+
+    const points = features[0].getGeometry().getCoordinates()
+    console.log(points)
+
+  },
+  function (error) {
+    alert(`ERROR: ${error.message}`);
+  },
+  {
+    enableHighAccuracy: true,
+  }
+);
+
+
+
+const locate = document.createElement('div');
+locate.className = 'ol-control ol-unselectable locate';
+locate.innerHTML = '<button title="Locate me">◎</button>';
+locate.addEventListener('click', function () {
+  if (!source.isEmpty()) {
+    const loc = source.getFeatures()
+    const center = loc[0].getGeometry().getCoordinates()
+    const view = map.getView()
+    view.animate({
+      center: center,
+      zoom: 15,
+    });
+  }
+});
+
+map.addControl(
+  new Control({
+    element: locate,
+  })
+);
+
+
 
 map.on('pointermove', (event) => {
   clusters.getFeatures(event.pixel).then((features) => {
@@ -265,7 +453,7 @@ map.on('click', (event) => {
           clusterCircles.setStyle(clusterCircleStyle);
         } else {
           // Zoom to the extent of the cluster members.
-          view.fit(extent, {duration: 500, padding: [50, 50, 50, 50]});
+          view.fit(extent, { duration: 500, padding: [50, 50, 50, 50] });
         }
       }
     }

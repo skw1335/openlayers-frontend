@@ -6,4 +6,15 @@ html, body {
 }
 #map {
   width: 100%;
+  height: 800px;
+}
+.locate {
+  	top: 4em;
+  	left: .5em;
+    width: 50px;
+    height: 50px;
+    padding: 10px;
+    margin: 5px;
+    background-color: #a10303;
+    color: white;
 }
