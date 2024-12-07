@@ -1,3 +1,7 @@
+Archived because I don't like OpenLayers. Moving on to Deck.gl
+
+=========================================================================================================================
+
 ReadMe borrowed from OpenLayers offical website. To demo the map, simply clone the repo and follow the instructions below!
 
 # OpenLayers + Vite
